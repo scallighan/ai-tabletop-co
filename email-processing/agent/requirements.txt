@@ -1,0 +1,4 @@
+fastapi[All]
+azure-identity
+msgraph-sdk
+msal
