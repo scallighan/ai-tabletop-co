@@ -1,10 +1,5 @@
 #!/bin/bash
-source terraform/.env
-
-export TENANT_ID=$TF_VAR_graph_tenant_id
-export CLIENT_ID=$TF_VAR_graph_client_id
-export CLIENT_SECRET=$TF_VAR_graph_client_secret
-
+source .env
 
 #get current time
 export CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
