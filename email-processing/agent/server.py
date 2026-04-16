@@ -74,6 +74,16 @@ async def get_field_value(fields, field_name):
         logger.error(f"Error extracting field '{field_name}': {str(e)}")
         return None
 
+def _get_sql_connection():
+    conn = pyodbc.connect(
+        f"Driver={{ODBC Driver 18 for SQL Server}};"
+        f"Server=tcp:{SQL_SERVER_NAME}.database.windows.net,1433;"
+        f"Database={SQL_DATABASE_NAME};"
+        f"UID={os.environ.get('AZURE_CLIENT_ID')};"
+        "Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;Authentication=ActiveDirectoryMsi;"
+    )
+    return conn
+
 async def process_attachment(attachment, email_id):
     credential = DefaultAzureCredential()
     client = ContentUnderstandingClient(endpoint=os.environ.get("CONTENTUNDERSTANDING_ENDPOINT"), credential=credential)
@@ -140,27 +150,19 @@ async def process_attachment(attachment, email_id):
             if len(rows) > 1:
                 logger.info(f"Rows to insert into SQL: {len(rows) - 1}")
                 try:
-                    token = credential.get_token("https://database.windows.net/.default")
-                    conn = pyodbc.connect(
-                        f"Driver={{ODBC Driver 18 for SQL Server}};"
-                        f"Server=tcp:{SQL_SERVER_NAME}.database.windows.net,1433;"
-                        f"Database={SQL_DATABASE_NAME};"
-                        f"UID={os.environ.get('AZURE_CLIENT_ID')};"
-                        "Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;Authentication=ActiveDirectoryMsi;"
-                    )
-                    cursor = conn.cursor()
-                    insert_sql = (
-                        "INSERT INTO PurchaseOrderLines "
-                        "(PONumber, CustomerName, Description, ProductCode, Quantity, QuantityUnit, "
-                        "UnitPrice, TaxAmount, TaxRate, LineTotal, SubtotalAmount, TotalTaxAmount, TotalAmount) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-                    )
-                    for row in rows[1:]:  # skip header row
-                        params = [None if v == "None" else v for v in row]
-                        cursor.execute(insert_sql, params)
-                    conn.commit()
-                    cursor.close()
-                    conn.close()
+                    with _get_sql_connection() as conn:
+                        cursor = conn.cursor()
+                        insert_sql = (
+                            "INSERT INTO PurchaseOrderLines "
+                            "(PONumber, CustomerName, Description, ProductCode, Quantity, QuantityUnit, "
+                            "UnitPrice, TaxAmount, TaxRate, LineTotal, SubtotalAmount, TotalTaxAmount, TotalAmount) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                        )
+                        for row in rows[1:]:  # skip header row
+                            params = [None if v == "None" else v for v in row]
+                            cursor.execute(insert_sql, params)
+                            conn.commit()
+                        
                     logger.info(f"Inserted {len(rows) - 1} rows into PurchaseOrderLines table")
                 except Exception as e:
                     logger.error(f"Error inserting rows into SQL: {str(e)}")
