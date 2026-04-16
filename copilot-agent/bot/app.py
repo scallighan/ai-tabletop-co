@@ -84,7 +84,7 @@ async def on_message(context: TurnContext, _):
         credential = DefaultAzureCredential()
         project_client = AIProjectClient(credential=credential, endpoint=os.getenv("AZURE_AI_PROJECT_ENDPOINT"))
         with project_client.get_openai_client() as openai_client:
-            agent_name = "bootcampagent"
+            agent_name = "AnalyticsInsightsAgent"
             if CONVERSATION_ID is None:
                 conversation = openai_client.conversations.create()
                 CONVERSATION_ID = conversation.id
