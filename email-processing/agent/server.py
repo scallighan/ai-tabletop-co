@@ -182,10 +182,14 @@ async def notifications(request: Request):
         message = await client.users.by_user_id(user_id).messages.by_message_id(message_id).get()
         # check the categories of the message to see if it has already been processed
         logger.info(f"Message categories: {message.categories}")
-        if message.categories and "EmailProcessingAgentProcessed" in message.categories:
+        if message.categories and ("ProcessingEmailAgent" in message.categories or "ProcessedEmailAgent" in message.categories):
             logger.info(f"Message {message_id} has already been processed, skipping")
             continue
-
+        # Add the tagged category to the message
+        update_message = Message(
+            categories=["ProcessingEmailAgent"]
+        )
+        await client.users.by_user_id(user_id).messages.by_message_id(message_id).patch(update_message)
         body_content = message.body.content
         logger.info(f"Message: {body_content}")
         logger.info(f"Message subject: {message.subject}")
@@ -202,7 +206,7 @@ async def notifications(request: Request):
 
         # Add the tagged category to the message
         update_message = Message(
-            categories=["EmailProcessingAgentProcessed"]
+            categories=["ProcessedEmailAgent"]
         )
         await client.users.by_user_id(user_id).messages.by_message_id(message_id).patch(update_message)
 
