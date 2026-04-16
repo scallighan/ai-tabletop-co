@@ -59,7 +59,7 @@ async def get_field_value(fields, field_name):
         # log the type of the field and its value
         logger.info(f"Extracting field '{field_name}': type={type(field)}, value={field.value if field else None}")
        
-        return f"{field.value}" if field else None
+        return field.value if field else None
     except Exception as e:
         logger.error(f"Error extracting field '{field_name}': {str(e)}")
         return None
@@ -113,7 +113,7 @@ async def process_attachment(attachment, email_id):
                                 tax_rate = await get_field_value(item_obj, "TaxRate")
                                 unit_price = await get_field_value(item_obj, "UnitPrice")
                                 logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
-                                row = [pONumber, customerName, description, product_code, quantity, quantity_unit, unit_price, tax_amount, tax_rate, subtotalAmount, totalTaxAmount, totalAmount]
+                                row = [f"{pONumber}", f"{customerName}", f"{description}", f"{product_code}", f"{quantity}", f"{quantity_unit}", f"{unit_price}", f"{tax_amount}", f"{tax_rate}", f"{subtotalAmount}", f"{totalTaxAmount}", f"{totalAmount}"]
                                 rows.append(row)
 
             except Exception as e:
