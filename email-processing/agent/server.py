@@ -22,7 +22,7 @@ from azure.ai.contentunderstanding.models import (
 )
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 
-
+from azure.ai.contentunderstanding.models._models import ObjectField
 dictConfig(log_config)
 logger = logging.getLogger("api-logger")
 
@@ -58,7 +58,12 @@ async def get_field_value(fields, field_name):
         field = fields.get(field_name)
         # log the type of the field and its value
         logger.info(f"Extracting field '{field_name}': type={type(field)}, value={field.value if field else None}")
-       
+        # if the field is azure.ai.contentunderstanding.models._models.ObjectField, we need to access the Amount field to get the actual object
+        if isinstance(field, ObjectField):
+            amount_field = field.get("Amount")
+            if amount_field:
+                logger.info(f"Extracting Amount from ObjectField '{field_name}': type={type(amount_field)}, value={amount_field.value if amount_field else None}")
+                return amount_field.value if amount_field else field.value
         return field.value if field else None
     except Exception as e:
         logger.error(f"Error extracting field '{field_name}': {str(e)}")
@@ -128,7 +133,7 @@ async def process_attachment(attachment, email_id):
             logger.info(f"Uploaded analysis result for attachment '{attachment.name}' to blob storage as '{blob_name}'")
             if len(rows) > 1:
                 logger.info(f"Rows: {rows}")
-                csv_content = "\n".join([",".join(row) for row in rows])
+                csv_content = "\n".join(["|".join(row) for row in rows])
                 csv_blob_name = f"{email_id}/{attachment.name}.csv"
                 csv_blob_client = container_client.get_blob_client(csv_blob_name)
                 csv_blob_client.upload_blob(csv_content, overwrite=True)
