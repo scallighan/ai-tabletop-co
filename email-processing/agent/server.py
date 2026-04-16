@@ -54,8 +54,12 @@ async def read_root():
 
 async def get_field_value(fields, field_name):
     """Helper function to safely extract field values."""
-    field = fields.get(field_name)
-    return field.value if field else None
+    try:
+        field = fields.get(field_name)
+        return field.value if field else None
+    except Exception as e:
+        logger.error(f"Error extracting field '{field_name}': {str(e)}")
+        return None
 
 async def process_attachment(attachment, email_id):
     credential = DefaultAzureCredential()
@@ -85,7 +89,15 @@ async def process_attachment(attachment, email_id):
                 if content.kind == AnalysisContentKind.DOCUMENT:
                     document_content: DocumentContent = content  # type: ignore
                     lineitems = await get_field_value(document_content.fields, "LineItems")
+                    pONumber = await get_field_value(document_content.fields, "PONumber")
+                    customerName = await get_field_value(document_content.fields, "CustomerName")
+                    subtotalAmount = await get_field_value(document_content.fields, "SubtotalAmount")
+                    totalTaxAmount = await get_field_value(document_content.fields, "TotalTaxAmount")
+                    totalAmount = await get_field_value(document_content.fields, "TotalAmount")
+                    rows = []
                     if lineitems:
+                        row = ["PONumber", "CustomerName", "Description", "ProductCode", "Quantity", "QuantityUnit", "UnitPrice", "TaxAmount", "TaxRate", "SubtotalAmount", "TotalTaxAmount", "TotalAmount"]
+                        rows.append(row)
                         logger.info(f"Extracted LineItems: {len(lineitems)}")
                         for idx, item in enumerate(lineitems):
                             if hasattr(item, 'value_object') and item.value_object:
@@ -98,6 +110,9 @@ async def process_attachment(attachment, email_id):
                                 tax_rate = await get_field_value(item_obj, "TaxRate")
                                 unit_price = await get_field_value(item_obj, "UnitPrice")
                                 logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
+                                row = [pONumber, customerName, description, product_code, quantity, quantity_unit, unit_price, tax_amount, tax_rate, subtotalAmount, totalTaxAmount, totalAmount]
+                                rows.append(row)
+
             except Exception as e:
                 logger.error(f"Error while processing analysis result: {str(e)}")   
             # write out the markdown content to a blob storage container for later review
@@ -108,6 +123,12 @@ async def process_attachment(attachment, email_id):
             markdown_content = content.markdown
             blob_client.upload_blob(markdown_content, overwrite=True)
             logger.info(f"Uploaded analysis result for attachment '{attachment.name}' to blob storage as '{blob_name}'")
+            if len(rows) > 1:
+                csv_content = "\n".join([",".join(row) for row in rows])
+                csv_blob_name = f"{email_id}/{attachment.name}.csv"
+                csv_blob_client = container_client.get_blob_client(csv_blob_name)
+                csv_blob_client.upload_blob(csv_content, overwrite=True)
+                logger.info(f"Uploaded extracted line items for attachment '{attachment.name}' to blob storage as '{csv_blob_name}'")
             return
         else:
             logger.warning(f"Attachment '{attachment.name}' is not a PDF (content_type: {attachment.content_type}), skipping analysis")
