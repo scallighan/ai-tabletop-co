@@ -105,7 +105,7 @@ async def process_attachment(attachment, email_id):
                     totalAmount = await get_field_value(document_content.fields, "TotalAmount")
                     rows = []
                     if lineitems:
-                        row = ["PONumber", "CustomerName", "Description", "ProductCode", "Quantity", "QuantityUnit", "UnitPrice", "TaxAmount", "TaxRate", "SubtotalAmount", "TotalTaxAmount", "TotalAmount"]
+                        row = ["PONumber", "CustomerName", "Description", "ProductCode", "Quantity", "QuantityUnit", "UnitPrice", "TaxAmount", "TaxRate", "LineTotal", "SubtotalAmount", "TotalTaxAmount", "TotalAmount"]
                         rows.append(row)
                         logger.info(f"Extracted LineItems: {len(lineitems)}")
                         for idx, item in enumerate(lineitems):
@@ -118,8 +118,9 @@ async def process_attachment(attachment, email_id):
                                 tax_amount = await get_field_value(item_obj, "TaxAmount")
                                 tax_rate = await get_field_value(item_obj, "TaxRate")
                                 unit_price = await get_field_value(item_obj, "UnitPrice")
-                                logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
-                                row = [f"{pONumber}", f"{customerName}", f"{description}", f"{product_code}", f"{quantity}", f"{quantity_unit}", f"{unit_price}", f"{tax_amount}", f"{tax_rate}", f"{subtotalAmount}", f"{totalTaxAmount}", f"{totalAmount}"]
+                                line_total = await get_field_value(item_obj, "TotalAmount")
+                                logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}, LineTotal={line_total}")
+                                row = [f"{pONumber}", f"{customerName}", f"{description}", f"{product_code}", f"{quantity}", f"{quantity_unit}", f"{unit_price}", f"{tax_amount}", f"{tax_rate}", f"{line_total}", f"{subtotalAmount}", f"{totalTaxAmount}", f"{totalAmount}"]
                                 rows.append(row)
 
             except Exception as e:
