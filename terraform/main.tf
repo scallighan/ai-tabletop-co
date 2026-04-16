@@ -360,6 +360,14 @@ resource "azurerm_container_app" "emailproc" {
         value = azurerm_user_assigned_identity.agent.client_id
       }
 
+      env {
+        name = "SERVER_NAME"
+        value = azurerm_mssql_server.this.name
+      }
+      env {
+        name = "DATABASE_NAME"
+        value = azurerm_mssql_database.this.name
+      }
     }
 
     http_scale_rule {
@@ -530,3 +538,36 @@ resource "azurerm_container_app" "emailproc" {
 #   principal_id         = azurerm_user_assigned_identity.bot.principal_id
 # }
 
+resource "azurerm_mssql_server" "this" {
+  name                         = "sql-${local.func_name}"
+  resource_group_name          = azurerm_resource_group.this.name
+  location                     = "westus2" # capacity
+  version                      = "12.0"
+
+  public_network_access_enabled = false
+  azuread_administrator {
+    login_username              = azurerm_user_assigned_identity.agent.name
+    object_id                   = azurerm_user_assigned_identity.agent.client_id
+    azuread_authentication_only = true
+  }
+
+  primary_user_assigned_identity_id = azurerm_user_assigned_identity.agent.id
+  identity {
+    type = "UserAssigned"
+    identity_ids = [
+      azurerm_user_assigned_identity.agent.id
+    ]
+  }
+
+  tags = local.tags
+}
+
+resource "azurerm_mssql_database" "this" {
+  name                = "db-${local.func_name}"
+  server_id           = azurerm_mssql_server.this.id
+  sku_name            = "Basic"
+  collation           = "SQL_Latin1_General_CP1_CI_AS"
+  max_size_gb        = 2
+
+  tags = local.tags
+}

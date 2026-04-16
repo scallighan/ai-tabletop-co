@@ -6,6 +6,7 @@ from .log_config import log_config
 import json
 import os
 import base64
+import pyodbc
 
 from azure.identity.aio import ClientSecretCredential
 
@@ -29,6 +30,9 @@ logger = logging.getLogger("api-logger")
 app = FastAPI(
     title="Graph Tagger Agent",
 )
+
+SQL_SERVER_NAME = os.environ.get("SERVER_NAME")
+SQL_DATABASE_NAME = os.environ.get("DATABASE_NAME")
 
 @app.middleware('http')
 async def logging_middleware(request: Request, call_next):
@@ -134,12 +138,32 @@ async def process_attachment(attachment, email_id):
             blob_client.upload_blob(markdown_content, overwrite=True)
             logger.info(f"Uploaded analysis result for attachment '{attachment.name}' to blob storage as '{blob_name}'")
             if len(rows) > 1:
-                logger.info(f"Rows: {rows}")
-                csv_content = "\n".join(["|".join(row) for row in rows])
-                csv_blob_name = f"{email_id}/{attachment.name}.csv"
-                csv_blob_client = container_client.get_blob_client(csv_blob_name)
-                csv_blob_client.upload_blob(csv_content, overwrite=True)
-                logger.info(f"Uploaded extracted line items for attachment '{attachment.name}' to blob storage as '{csv_blob_name}'")
+                logger.info(f"Rows to insert into SQL: {len(rows) - 1}")
+                try:
+                    token = credential.get_token("https://database.windows.net/.default")
+                    conn = pyodbc.connect(
+                        f"Driver={{ODBC Driver 18 for SQL Server}};"
+                        f"Server=tcp:{SQL_SERVER_NAME}.database.windows.net,1433;"
+                        f"Database={SQL_DATABASE_NAME};"
+                        f"UID={os.environ.get('AZURE_CLIENT_ID')};"
+                        "Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;Authentication=ActiveDirectoryMsi;"
+                    )
+                    cursor = conn.cursor()
+                    insert_sql = (
+                        "INSERT INTO PurchaseOrderLines "
+                        "(PONumber, CustomerName, Description, ProductCode, Quantity, QuantityUnit, "
+                        "UnitPrice, TaxAmount, TaxRate, LineTotal, SubtotalAmount, TotalTaxAmount, TotalAmount) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    )
+                    for row in rows[1:]:  # skip header row
+                        params = [None if v == "None" else v for v in row]
+                        cursor.execute(insert_sql, params)
+                    conn.commit()
+                    cursor.close()
+                    conn.close()
+                    logger.info(f"Inserted {len(rows) - 1} rows into PurchaseOrderLines table")
+                except Exception as e:
+                    logger.error(f"Error inserting rows into SQL: {str(e)}")
             return
         else:
             logger.warning(f"Attachment '{attachment.name}' is not a PDF (content_type: {attachment.content_type}), skipping analysis")

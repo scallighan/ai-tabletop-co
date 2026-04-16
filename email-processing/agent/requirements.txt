@@ -4,3 +4,4 @@ msgraph-sdk
 msal
 azure-ai-contentunderstanding
 azure-storage-blob
+pyodbc
