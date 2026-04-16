@@ -1,6 +1,6 @@
 FROM python:3.12
 
-RUN apt-get update && apt-get install -y curl tcpdump net-tools vim
+RUN apt-get update && apt-get install -y curl tcpdump net-tools vim unixodbc
 
 WORKDIR /code
 
