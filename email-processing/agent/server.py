@@ -78,24 +78,26 @@ async def process_attachment(attachment):
                 return
             content: AnalysisContent = result.contents[0]
 
-            # Access document-specific properties
-            if content.kind == AnalysisContentKind.DOCUMENT:
-                document_content: DocumentContent = content  # type: ignore
-                lineitems = await get_field_value(content.fields, "LineItems")
-                if lineitems:
-                    logger.info(f"Extracted LineItems: {len(lineitems)}")
-                    for idx, item in enumerate(lineitems):
-                        if hasattr(item, 'value_object') and item.value_object:
-                            item_obj = item.value_object
-                            description = await get_field_value(item_obj, "Description")
-                            product_code = await get_field_value(item_obj, "ProductCode")
-                            quantity = await get_field_value(item_obj, "Quantity")
-                            quantity_unit = await get_field_value(item_obj, "QuantityUnit")
-                            tax_amount = await get_field_value(item_obj, "TaxAmount")
-                            tax_rate = await get_field_value(item_obj, "TaxRate")
-                            unit_price = await get_field_value(item_obj, "UnitPrice")
-                            logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
-            
+            try:
+                # Access document-specific properties
+                if content.kind == AnalysisContentKind.DOCUMENT:
+                    document_content: DocumentContent = content  # type: ignore
+                    lineitems = await get_field_value(document_content.fields, "LineItems")
+                    if lineitems:
+                        logger.info(f"Extracted LineItems: {len(lineitems)}")
+                        for idx, item in enumerate(lineitems):
+                            if hasattr(item, 'value_object') and item.value_object:
+                                item_obj = item.value_object
+                                description = await get_field_value(item_obj, "Description")
+                                product_code = await get_field_value(item_obj, "ProductCode")
+                                quantity = await get_field_value(item_obj, "Quantity")
+                                quantity_unit = await get_field_value(item_obj, "QuantityUnit")
+                                tax_amount = await get_field_value(item_obj, "TaxAmount")
+                                tax_rate = await get_field_value(item_obj, "TaxRate")
+                                unit_price = await get_field_value(item_obj, "UnitPrice")
+                                logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
+            except Exception as e:
+                logger.error(f"Error while processing analysis result: {str(e)}")   
             # write out the markdown content to a blob storage container for later review
             blob_service_client = BlobServiceClient(credential=credential, account_url=f"https://{os.environ.get('STORAGE_ACCOUNT_NAME')}.blob.core.windows.net")
             container_client = blob_service_client.get_container_client(os.environ.get('STORAGE_CONTAINER_NAME'))
