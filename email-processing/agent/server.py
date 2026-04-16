@@ -87,13 +87,13 @@ async def process_attachment(attachment):
                     for idx, item in enumerate(lineitems):
                         if hasattr(item, 'value_object') and item.value_object:
                             item_obj = item.value_object
-                            description = await get_field_value(item_obj.fields, "Description")
-                            product_code = await get_field_value(item_obj.fields, "ProductCode")
-                            quantity = await get_field_value(item_obj.fields, "Quantity")
-                            quantity_unit = await get_field_value(item_obj.fields, "QuantityUnit")
-                            tax_amount = await get_field_value(item_obj.fields, "TaxAmount")
-                            tax_rate = await get_field_value(item_obj.fields, "TaxRate")
-                            unit_price = await get_field_value(item_obj.fields, "UnitPrice")
+                            description = await get_field_value(item_obj, "Description")
+                            product_code = await get_field_value(item_obj, "ProductCode")
+                            quantity = await get_field_value(item_obj, "Quantity")
+                            quantity_unit = await get_field_value(item_obj, "QuantityUnit")
+                            tax_amount = await get_field_value(item_obj, "TaxAmount")
+                            tax_rate = await get_field_value(item_obj, "TaxRate")
+                            unit_price = await get_field_value(item_obj, "UnitPrice")
                             logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
             
             # write out the markdown content to a blob storage container for later review
