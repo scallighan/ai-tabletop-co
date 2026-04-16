@@ -57,28 +57,30 @@ async def get_field_value(fields, field_name):
     field = fields.get(field_name)
     return field.value if field else None
 
-async def process_attachment(attachment):
+async def process_attachment(attachment, email_id):
     credential = DefaultAzureCredential()
     client = ContentUnderstandingClient(endpoint=os.environ.get("CONTENTUNDERSTANDING_ENDPOINT"), credential=credential)
     logger.info(f"Attachment name: {attachment.name}, content_type: {attachment.content_type}, size: {attachment.size}")
     # Get the binary content of the attachment
-    content_bytes = attachment.content_bytes
-    if content_bytes:
+    content_bytes_base64 = attachment.content_bytes
+    
+    if content_bytes_base64:
         logger.info(f"Attachment '{attachment.name}' binary content size: {len(content_bytes)} bytes")
         if attachment.content_type == "application/pdf":
             logger.info(f"Attachment '{attachment.name}' is a PDF, proceeding with analysis")
-        
-            poller = client.begin_analyze_binary(
-                analyzer_id="prebuilt-procurement",
-                binary_input=content_bytes,
-            )
-            result: AnalysisResult = poller.result()
-            if not result.contents or len(result.contents) == 0:
-                logger.warning("No content found in the analysis result.")
-                return
-            content: AnalysisContent = result.contents[0]
-
             try:
+                content_bytes = base64.b64decode(content_bytes_base64) if content_bytes_base64 else None
+                poller = client.begin_analyze_binary(
+                    analyzer_id="prebuilt-procurement",
+                    binary_input=content_bytes,
+                )
+                result: AnalysisResult = poller.result()
+                if not result.contents or len(result.contents) == 0:
+                    logger.warning("No content found in the analysis result.")
+                    return
+                content: AnalysisContent = result.contents[0]
+
+            
                 # Access document-specific properties
                 if content.kind == AnalysisContentKind.DOCUMENT:
                     document_content: DocumentContent = content  # type: ignore
@@ -101,7 +103,7 @@ async def process_attachment(attachment):
             # write out the markdown content to a blob storage container for later review
             blob_service_client = BlobServiceClient(credential=credential, account_url=f"https://{os.environ.get('STORAGE_ACCOUNT_NAME')}.blob.core.windows.net")
             container_client = blob_service_client.get_container_client(os.environ.get('STORAGE_CONTAINER_NAME'))
-            blob_name = f"{attachment.name}_{attachment.id}.md"
+            blob_name = f"{email_id}/{attachment.name}.md"
             blob_client = container_client.get_blob_client(blob_name)
             markdown_content = content.markdown
             blob_client.upload_blob(markdown_content, overwrite=True)
@@ -165,7 +167,7 @@ async def notifications(request: Request):
         if message.has_attachments:
             attachments = await client.users.by_user_id(user_id).messages.by_message_id(message_id).attachments.get()
             for attachment in attachments.value:
-                await process_attachment(attachment)
+                await process_attachment(attachment, message_id)
                     
 
         # Add the tagged category to the message
