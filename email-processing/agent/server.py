@@ -65,7 +65,7 @@ async def process_attachment(attachment, email_id):
     content_bytes_base64 = attachment.content_bytes
     
     if content_bytes_base64:
-        logger.info(f"Attachment '{attachment.name}' binary content size: {len(content_bytes)} bytes")
+        logger.info(f"Attachment '{attachment.name}' binary content size: {len(content_bytes_base64)} bytes")
         if attachment.content_type == "application/pdf":
             logger.info(f"Attachment '{attachment.name}' is a PDF, proceeding with analysis")
             try:
