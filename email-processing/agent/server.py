@@ -60,7 +60,8 @@ async def get_field_value(fields, field_name):
         logger.info(f"Extracting field '{field_name}': type={type(field)}, value={field.value if field else None}")
         # if the field is azure.ai.contentunderstanding.models._models.ObjectField, we need to access the Amount field to get the actual object
         if isinstance(field, ObjectField):
-            amount_field = field.get("Amount")
+            logger.info(f"Field '{field_name}' is an ObjectField, attempting to extract 'Amount' field from it")
+            amount_field = field.value_object.get("Amount")
             if amount_field:
                 logger.info(f"Extracting Amount from ObjectField '{field_name}': type={type(amount_field)}, value={amount_field.value if amount_field else None}")
                 return amount_field.value if amount_field else field.value
