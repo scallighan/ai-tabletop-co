@@ -57,6 +57,75 @@ resource "azurerm_resource_group" "this" {
   tags     = local.tags
 }
 
+resource "azurerm_virtual_network" "this" {
+  name                = "vnet-${local.func_name}-${local.loc_for_naming}"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  address_space       = ["172.21.0.0/16"]
+
+  tags = local.tags
+}
+
+resource "azurerm_subnet" "fw" {
+  name                 = "snet-fw-${local.func_name}-${local.loc_for_naming}"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = ["172.21.0.0/28"]
+}
+
+resource "azurerm_subnet" "fwmgmt" {
+  name                 = "snet-fwmgmt-${local.func_name}-${local.loc_for_naming}"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = ["172.21.0.16/28"]
+}
+
+resource "azurerm_subnet" "appgw" {
+  name                 = "snet-appgw-${local.func_name}-${local.loc_for_naming}"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = ["172.21.0.32/28"]
+}
+
+resource "azurerm_subnet" "pe" {
+  name                 = "snet-pe-${local.func_name}-${local.loc_for_naming}"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = ["172.21.1.0/24"]
+}
+
+resource "azurerm_subnet" "cluster" {
+  name                 = "snet-cluster-${local.func_name}-${local.loc_for_naming}"
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = ["172.21.2.0/24"]
+
+  delegation {
+    name = "Microsoft.App/environments"
+    service_delegation {
+      name    = "Microsoft.App/environments"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
+}
+
+## Private DNS zones for Private Endpoints
+
+#privatelink.blob.core.windows.net
+resource "azurerm_private_dns_zone" "blob" {
+  name                = "privatelink.blob.core.windows.net"
+  resource_group_name = azurerm_resource_group.this.name
+  tags = local.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
+  name                  = "blob"
+  resource_group_name   = azurerm_resource_group.this.name
+  private_dns_zone_name = azurerm_private_dns_zone.blob.name
+  virtual_network_id    = azurerm_virtual_network.this.id
+}
+
+
 resource "azurerm_storage_account" "this" {
   name = "sa${local.func_name}${lower(local.loc_short)}"
   resource_group_name = azurerm_resource_group.this.name
@@ -78,6 +147,34 @@ resource "azurerm_storage_account" "this" {
     ]
   }
   
+  tags = local.tags
+}
+
+resource "azurerm_storage_container" "attachments" {
+  name                  = "attachments"
+  storage_account_id    = azurerm_storage_account.this.id
+  container_access_type = "private"
+}
+
+resource "azurerm_private_endpoint" "sa_pe" {
+  depends_on = [ azurerm_storage_container.attachments ]
+  name                = "pe-sa-${local.func_name}"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  subnet_id           = azurerm_subnet.pe.id
+
+  private_service_connection {
+    name                           = "psc-sa-${local.func_name}"
+    private_connection_resource_id = azurerm_storage_account.this.id
+    is_manual_connection           = false
+    subresource_names              = ["blob"]
+  }
+
+  private_dns_zone_group {
+    name                 = "blob"
+    private_dns_zone_ids = [azurerm_private_dns_zone.blob.id]
+  }
+
   tags = local.tags
 }
 
@@ -158,6 +255,26 @@ resource "azapi_resource" "ai_foundry_project" {
   ]
 }
 
+resource azurerm_user_assigned_identity "agent" {
+  name                = "uai-agent-${local.func_name}"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+}
+
+# give the agent identity access to the AI Foundry project with Azure AI User role
+resource "azurerm_role_assignment" "agent_foundry_access" {
+  scope                = azurerm_resource_group.this.id
+  role_definition_name = "Azure AI User"
+  principal_id         = azurerm_user_assigned_identity.agent.principal_id
+}
+
+resource "azurerm_role_assignment" "agent_storage_access" {
+  scope                = azurerm_resource_group.this.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.agent.principal_id
+}
+
+
 # App Insight instance for monitoring
 resource "azurerm_application_insights" "this" {
   name                = "appi${local.func_name}"
@@ -174,6 +291,8 @@ resource "azurerm_container_app_environment" "this" {
   location                   = azurerm_resource_group.this.location
   resource_group_name        = azurerm_resource_group.this.name
   log_analytics_workspace_id = data.azurerm_log_analytics_workspace.default.id
+
+  infrastructure_subnet_id = azurerm_subnet.cluster.id
 
   workload_profile {
     name                  = "Consumption"
@@ -215,7 +334,32 @@ resource "azurerm_container_app" "emailproc" {
         name = "GRAPH_CLIENT_SECRET"
         value = azuread_application_password.graph.value # TODO put in keyvault
       }
+
+      env {
+        name = "AZURE_AI_PROJECT_ENDPOINT"
+        value = "https://aif${local.func_name}.services.ai.azure.com/api/projects/fp${local.func_name}"
+      }
+
+      env {
+        name = "CONTENTUNDERSTANDING_ENDPOINT"
+        value = "https://aif${local.func_name}.services.ai.azure.com/"
+      }
+
+      env {
+        name = "STORAGE_ACCOUNT_NAME"
+        value = azurerm_storage_account.this.name
+      }
+
+      env {
+        name = "STORAGE_CONTAINER_NAME"
+        value = azurerm_storage_container.attachments.name
+      }
       
+      env {
+        name = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.agent.client_id
+      }
+
     }
 
     http_scale_rule {
@@ -237,6 +381,13 @@ resource "azurerm_container_app" "emailproc" {
       percentage      = 100
     }
   }
+
+  identity {
+    type = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.agent.id]
+  }
+
+  tags = local.tags
 }
 
 # resource "azurerm_container_app" "bot" {

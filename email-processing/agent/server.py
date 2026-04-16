@@ -12,8 +12,16 @@ from azure.identity.aio import ClientSecretCredential
 from msgraph import GraphServiceClient
 from msgraph.generated.models.message import Message
 
-from msgraph.generated.users.item.mail_folders.item.messages.messages_request_builder import MessagesRequestBuilder
-from kiota_abstractions.base_request_configuration import RequestConfiguration
+from azure.identity import DefaultAzureCredential
+from azure.ai.contentunderstanding import ContentUnderstandingClient
+from azure.ai.contentunderstanding.models import (
+    AnalysisContent,
+    AnalysisContentKind,
+    AnalysisResult,
+    DocumentContent
+)
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+
 
 dictConfig(log_config)
 logger = logging.getLogger("api-logger")
@@ -43,6 +51,59 @@ async def logging_middleware(request: Request, call_next):
 @app.get("/")
 async def read_root():
     return {"Hello": "World"}
+
+async def get_field_value(fields, field_name):
+    """Helper function to safely extract field values."""
+    field = fields.get(field_name)
+    return field.value if field else None
+
+async def process_attachment(attachment):
+    credential = DefaultAzureCredential()
+    client = ContentUnderstandingClient(endpoint=os.environ.get("CONTENTUNDERSTANDING_ENDPOINT"), credential=credential)
+    logger.info(f"Attachment name: {attachment.name}, content_type: {attachment.content_type}, size: {attachment.size}")
+    # Get the binary content of the attachment
+    content_bytes = attachment.content_bytes
+    if content_bytes:
+        logger.info(f"Attachment '{attachment.name}' binary content size: {len(content_bytes)} bytes")
+        poller = client.begin_analyze_binary(
+            analyzer_id="prebuilt-procurement",
+            binary_input=content_bytes,
+        )
+        result: AnalysisResult = poller.result()
+        if not result.contents or len(result.contents) == 0:
+            print("No content found in the analysis result.")
+            return
+        content: AnalysisContent = result.contents[0]
+
+        # Access document-specific properties
+        if content.kind == AnalysisContentKind.DOCUMENT:
+            document_content: DocumentContent = content  # type: ignore
+            lineitems = await get_field_value(content.fields, "LineItems")
+            if lineitems:
+                logger.info(f"Extracted LineItems: {len(lineitems)}")
+                for idx, item in enumerate(lineitems):
+                    if hasattr(item, 'value_object') and item.value_object:
+                        item_obj = item.value_object
+                        description = await get_field_value(item_obj.fields, "Description")
+                        product_code = await get_field_value(item_obj.fields, "ProductCode")
+                        quantity = await get_field_value(item_obj.fields, "Quantity")
+                        quantity_unit = await get_field_value(item_obj.fields, "QuantityUnit")
+                        tax_amount = await get_field_value(item_obj.fields, "TaxAmount")
+                        tax_rate = await get_field_value(item_obj.fields, "TaxRate")
+                        unit_price = await get_field_value(item_obj.fields, "UnitPrice")
+                        logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
+        
+        # write out the markdown content to a blob storage container for later review
+        blob_service_client = BlobServiceClient(credential=credential, account_url=f"https://{os.environ.get('STORAGE_ACCOUNT_NAME')}.blob.core.windows.net")
+        container_client = blob_service_client.get_container_client(os.environ.get('STORAGE_CONTAINER_NAME'))
+        blob_name = f"{attachment.name}_{attachment.id}.md"
+        blob_client = container_client.get_blob_client(blob_name)
+        markdown_content = content.markdown
+        blob_client.upload_blob(markdown_content, overwrite=True)
+        logger.info(f"Uploaded analysis result for attachment '{attachment.name}' to blob storage as '{blob_name}'")
+                        
+
+    
 
 @app.post("/notifications")
 async def notifications(request: Request):
@@ -91,21 +152,12 @@ async def notifications(request: Request):
         logger.info(f"Message conversation_index: {message.conversation_index}")
 
         # Get attachments if the message has any
-        attachments_data = []
+        
         if message.has_attachments:
             attachments = await client.users.by_user_id(user_id).messages.by_message_id(message_id).attachments.get()
             for attachment in attachments.value:
-                logger.info(f"Attachment name: {attachment.name}, content_type: {attachment.content_type}, size: {attachment.size}")
-                # Get the binary content of the attachment
-                content_bytes = attachment.content_bytes
-                if content_bytes:
-                    logger.info(f"Attachment '{attachment.name}' binary content size: {len(content_bytes)} bytes")
-                    attachments_data.append({
-                        "name": attachment.name,
-                        "content_type": attachment.content_type,
-                        "size": attachment.size,
-                        "content_bytes": content_bytes,
-                    })
+                await process_attachment(attachment)
+                    
 
         # Add the tagged category to the message
         update_message = Message(

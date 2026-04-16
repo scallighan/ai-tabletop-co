@@ -2,3 +2,5 @@ fastapi[All]
 azure-identity
 msgraph-sdk
 msal
+azure-ai-contentunderstanding
+azure-storage-blob

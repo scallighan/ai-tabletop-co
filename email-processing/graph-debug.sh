@@ -1,0 +1,40 @@
+#!/bin/bash
+source .env
+
+#get current time
+export CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# add 10070 minutes to the current time
+export EXPIRATION_TIME=$(date -u -d "$CURRENT_TIME + 10070 minutes" +"%Y-%m-%dT%H:%M:%SZ")
+
+
+# Get the access token
+TOKEN=$(curl -s -X POST \
+  "https://login.microsoftonline.com/$TENANT_ID/oauth2/v2.0/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=$CLIENT_ID" \
+  -d "client_secret=$CLIENT_SECRET" \
+  -d "scope=https://graph.microsoft.com/.default" \
+  -d "grant_type=client_credentials" | jq -r '.access_token')
+
+# Check if the token was retrieved successfully
+if [ -z "$TOKEN" ]; then
+  echo "Failed to retrieve access token"
+  exit 1
+fi
+# Subscribe to the Microsoft Graph API
+
+
+#export PAYLOAD='{"changeType": "created","notificationUrl": "'$NOTIFICATION_URL'","resource": "/users/'$EMAIL'/messages","expirationDateTime": "'$EXPIRATION_TIME'","clientState": "secretClientValue"}'
+
+#echo $PAYLOAD | jq .
+
+# curl -vvv \
+#   "https://graph.microsoft.com/v1.0/subscriptions" \
+#   -H "Authorization: Bearer $TOKEN" \
+#   -H "Content-Type: application/json"
+
+
+curl -vvv -X DELETE \
+  "https://graph.microsoft.com/v1.0/subscriptions/9621f2ab-9728-4351-a440-b5f72634a675" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json"
