@@ -1,0 +1,68 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.25/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.25",
+  "id": "${{TEAMS_APP_ID}}",
+  "version": "1.0.0",
+  "developer": {
+    "name": "AI Tabletop Co",
+    "websiteUrl": "https://github.com/scallighan/ai-tabletop-co",
+    "privacyUrl": "https://github.com/scallighan/ai-tabletop-co",
+    "termsOfUseUrl": "https://github.com/scallighan/ai-tabletop-co"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Analytics-Insights-Agent",
+    "full": "Analytics Insights Agent"
+  },
+  "description": {
+    "short": "Interact with a Foundry agent",
+    "full": "Interact with a Foundry agent full description"
+  },
+  "accentColor": "#FFFFFF",
+  "copilotAgents": { 
+    "customEngineAgents": [ 
+        { 
+            "id": "${{BOT_ID}}", 
+            "type": "bot" 
+        } 
+    ]
+  },
+  "bots": [
+    {
+      "botId": "${{BOT_ID}}",
+      "scopes": ["personal"],
+      "isNotificationOnly": false,
+      "supportsCalling": false,
+      "supportsVideo": false,
+      "supportsFiles": false,
+      "commandLists":[
+        {
+            "scopes": [
+                "personal"
+            ],
+            "commands": [
+                {
+                    "title": "help",
+                    "description": "Show the help information"
+                }
+            ]
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "${{BOT_DOMAIN}}",
+    "*.botframework.com"
+  ],
+  "webApplicationInfo": {
+    "id": "${{BOT_ID}}",
+    "resource": "api://botid-${{BOT_ID}}"
+  }
+}

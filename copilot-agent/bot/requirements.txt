@@ -1,0 +1,7 @@
+microsoft-agents-hosting-aiohttp
+cryptography
+microsoft-agents-authentication-msal
+dotenv
+agent-framework>=1.0.0rc5
+azure-identity
+azure-ai-projects>=2.0.1

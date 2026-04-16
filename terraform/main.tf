@@ -125,6 +125,20 @@ resource "azurerm_private_dns_zone_virtual_network_link" "blob" {
   virtual_network_id    = azurerm_virtual_network.this.id
 }
 
+#privatelink.database.windows.net
+resource "azurerm_private_dns_zone" "sql" {
+  name                = "privatelink.database.windows.net"
+  resource_group_name = azurerm_resource_group.this.name
+  tags = local.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "sql" {
+  name                  = "sql"
+  resource_group_name   = azurerm_resource_group.this.name
+  private_dns_zone_name = azurerm_private_dns_zone.sql.name
+  virtual_network_id    = azurerm_virtual_network.this.id
+}
+
 
 resource "azurerm_storage_account" "this" {
   name = "sa${local.func_name}${lower(local.loc_short)}"
@@ -188,6 +202,12 @@ resource "azurerm_role_assignment" "current_user_storage" {
 # add a blob container to the storage account for the search service to use
 resource "azurerm_storage_container" "search" {
   name                  = "search"
+  storage_account_id    = azurerm_storage_account.this.id
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "reviews" {
+  name                  = "reviews"
   storage_account_id    = azurerm_storage_account.this.id
   container_access_type = "private"
 }
@@ -544,10 +564,10 @@ resource "azurerm_mssql_server" "this" {
   location                     = "westus2" # capacity
   version                      = "12.0"
 
-  public_network_access_enabled = false
+  public_network_access_enabled = true
   azuread_administrator {
-    login_username              = azurerm_user_assigned_identity.agent.name
-    object_id                   = azurerm_user_assigned_identity.agent.client_id
+    login_username              = "SQLADMINS"
+    object_id                   = "243097c3-3bdf-4436-90c8-423b73c85e2e" # object id for the SQLADMINS Entra group
     azuread_authentication_only = true
   }
 
@@ -570,4 +590,64 @@ resource "azurerm_mssql_database" "this" {
   max_size_gb        = 2
 
   tags = local.tags
+}
+
+# create a private endpoint for the Azure SQL Database
+resource "azurerm_private_endpoint" "sql" {
+  name                = "pe-sql-${local.func_name}"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  subnet_id           = azurerm_subnet.pe.id
+  private_service_connection {
+    name                           = "psc-sql-${local.func_name}"
+    is_manual_connection            = false
+    private_connection_resource_id   = azurerm_mssql_server.this.id
+    subresource_names               = ["sqlServer"]
+  }
+
+  private_dns_zone_group {
+    name = "pdzg-sql-${local.func_name}"
+    private_dns_zone_ids = [ azurerm_private_dns_zone.sql.id ]
+  }
+  tags = local.tags
+}
+
+resource "azurerm_search_service" "this" {
+  name                = "ais${local.func_name}"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = "westus3" # capacity
+  sku                 = "basic"
+
+  local_authentication_enabled = false
+
+  semantic_search_sku = "free"
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# give access to the search service to the storage account
+resource "azurerm_role_assignment" "search_storage" {
+  scope                = azurerm_storage_account.this.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_search_service.this.identity[0].principal_id
+} 
+
+resource "azurerm_role_assignment" "azure_ai_user_ai_search" {
+  scope                = azurerm_resource_group.this.id
+  role_definition_name = "Azure AI User"
+  principal_id         = azurerm_search_service.this.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "search_index_data_contributor_ai_foundry_project" {
+  scope                = azurerm_resource_group.this.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = azapi_resource.ai_foundry_project.output.identity.principalId
+}
+
+resource "azurerm_role_assignment" "search_index_data_contributor_current_user" {
+  scope                = azurerm_resource_group.this.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
 }
