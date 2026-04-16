@@ -65,13 +65,18 @@ async def process_attachment(attachment):
     content_bytes = attachment.content_bytes
     if content_bytes:
         logger.info(f"Attachment '{attachment.name}' binary content size: {len(content_bytes)} bytes")
+        if attachment.content_type == "application/pdf":
+             logger.info(f"Attachment '{attachment.name}' is a PDF, proceeding with analysis")
+        else:
+             logger.warning(f"Attachment '{attachment.name}' is not a PDF (content_type: {attachment.content_type}), skipping analysis")
+             return
         poller = client.begin_analyze_binary(
             analyzer_id="prebuilt-procurement",
             binary_input=content_bytes,
         )
         result: AnalysisResult = poller.result()
         if not result.contents or len(result.contents) == 0:
-            print("No content found in the analysis result.")
+            logger.warning("No content found in the analysis result.")
             return
         content: AnalysisContent = result.contents[0]
 
