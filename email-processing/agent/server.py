@@ -66,47 +66,49 @@ async def process_attachment(attachment):
     if content_bytes:
         logger.info(f"Attachment '{attachment.name}' binary content size: {len(content_bytes)} bytes")
         if attachment.content_type == "application/pdf":
-             logger.info(f"Attachment '{attachment.name}' is a PDF, proceeding with analysis")
-        else:
-             logger.warning(f"Attachment '{attachment.name}' is not a PDF (content_type: {attachment.content_type}), skipping analysis")
-             return
-        poller = client.begin_analyze_binary(
-            analyzer_id="prebuilt-procurement",
-            binary_input=content_bytes,
-        )
-        result: AnalysisResult = poller.result()
-        if not result.contents or len(result.contents) == 0:
-            logger.warning("No content found in the analysis result.")
-            return
-        content: AnalysisContent = result.contents[0]
-
-        # Access document-specific properties
-        if content.kind == AnalysisContentKind.DOCUMENT:
-            document_content: DocumentContent = content  # type: ignore
-            lineitems = await get_field_value(content.fields, "LineItems")
-            if lineitems:
-                logger.info(f"Extracted LineItems: {len(lineitems)}")
-                for idx, item in enumerate(lineitems):
-                    if hasattr(item, 'value_object') and item.value_object:
-                        item_obj = item.value_object
-                        description = await get_field_value(item_obj.fields, "Description")
-                        product_code = await get_field_value(item_obj.fields, "ProductCode")
-                        quantity = await get_field_value(item_obj.fields, "Quantity")
-                        quantity_unit = await get_field_value(item_obj.fields, "QuantityUnit")
-                        tax_amount = await get_field_value(item_obj.fields, "TaxAmount")
-                        tax_rate = await get_field_value(item_obj.fields, "TaxRate")
-                        unit_price = await get_field_value(item_obj.fields, "UnitPrice")
-                        logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
+            logger.info(f"Attachment '{attachment.name}' is a PDF, proceeding with analysis")
         
-        # write out the markdown content to a blob storage container for later review
-        blob_service_client = BlobServiceClient(credential=credential, account_url=f"https://{os.environ.get('STORAGE_ACCOUNT_NAME')}.blob.core.windows.net")
-        container_client = blob_service_client.get_container_client(os.environ.get('STORAGE_CONTAINER_NAME'))
-        blob_name = f"{attachment.name}_{attachment.id}.md"
-        blob_client = container_client.get_blob_client(blob_name)
-        markdown_content = content.markdown
-        blob_client.upload_blob(markdown_content, overwrite=True)
-        logger.info(f"Uploaded analysis result for attachment '{attachment.name}' to blob storage as '{blob_name}'")
-                        
+            poller = client.begin_analyze_binary(
+                analyzer_id="prebuilt-procurement",
+                binary_input=content_bytes,
+            )
+            result: AnalysisResult = poller.result()
+            if not result.contents or len(result.contents) == 0:
+                logger.warning("No content found in the analysis result.")
+                return
+            content: AnalysisContent = result.contents[0]
+
+            # Access document-specific properties
+            if content.kind == AnalysisContentKind.DOCUMENT:
+                document_content: DocumentContent = content  # type: ignore
+                lineitems = await get_field_value(content.fields, "LineItems")
+                if lineitems:
+                    logger.info(f"Extracted LineItems: {len(lineitems)}")
+                    for idx, item in enumerate(lineitems):
+                        if hasattr(item, 'value_object') and item.value_object:
+                            item_obj = item.value_object
+                            description = await get_field_value(item_obj.fields, "Description")
+                            product_code = await get_field_value(item_obj.fields, "ProductCode")
+                            quantity = await get_field_value(item_obj.fields, "Quantity")
+                            quantity_unit = await get_field_value(item_obj.fields, "QuantityUnit")
+                            tax_amount = await get_field_value(item_obj.fields, "TaxAmount")
+                            tax_rate = await get_field_value(item_obj.fields, "TaxRate")
+                            unit_price = await get_field_value(item_obj.fields, "UnitPrice")
+                            logger.info(f"LineItem {idx}: Description={description}, ProductCode={product_code}, Quantity={quantity} {quantity_unit}, UnitPrice={unit_price}, TaxAmount={tax_amount}, TaxRate={tax_rate}")
+            
+            # write out the markdown content to a blob storage container for later review
+            blob_service_client = BlobServiceClient(credential=credential, account_url=f"https://{os.environ.get('STORAGE_ACCOUNT_NAME')}.blob.core.windows.net")
+            container_client = blob_service_client.get_container_client(os.environ.get('STORAGE_CONTAINER_NAME'))
+            blob_name = f"{attachment.name}_{attachment.id}.md"
+            blob_client = container_client.get_blob_client(blob_name)
+            markdown_content = content.markdown
+            blob_client.upload_blob(markdown_content, overwrite=True)
+            logger.info(f"Uploaded analysis result for attachment '{attachment.name}' to blob storage as '{blob_name}'")
+            return
+        else:
+            logger.warning(f"Attachment '{attachment.name}' is not a PDF (content_type: {attachment.content_type}), skipping analysis")
+            return
+                            
 
     
 
