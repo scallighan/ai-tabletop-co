@@ -124,6 +124,7 @@ async def process_attachment(attachment, email_id):
             blob_client.upload_blob(markdown_content, overwrite=True)
             logger.info(f"Uploaded analysis result for attachment '{attachment.name}' to blob storage as '{blob_name}'")
             if len(rows) > 1:
+                logger.info(f"Rows: {rows}")
                 csv_content = "\n".join([",".join(row) for row in rows])
                 csv_blob_name = f"{email_id}/{attachment.name}.csv"
                 csv_blob_client = container_client.get_blob_client(csv_blob_name)
