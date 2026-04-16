@@ -56,7 +56,10 @@ async def get_field_value(fields, field_name):
     """Helper function to safely extract field values."""
     try:
         field = fields.get(field_name)
-        return field.value if field else None
+        # log the type of the field and its value
+        logger.info(f"Extracting field '{field_name}': type={type(field)}, value={field.value if field else None}")
+       
+        return f"{field.value}" if field else None
     except Exception as e:
         logger.error(f"Error extracting field '{field_name}': {str(e)}")
         return None
