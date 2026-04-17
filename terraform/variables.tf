@@ -11,3 +11,8 @@ variable "location" {
 variable "gh_repo" {
   type = string
 }
+
+variable "agent_name" {
+  type = string
+  default = "helloworld"
+}

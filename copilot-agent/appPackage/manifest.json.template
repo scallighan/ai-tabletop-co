@@ -1,68 +1,54 @@
 {
-  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.24/MicrosoftTeams.schema.json",
-  "manifestVersion": "1.24",
-  "id": "${{TEAMS_APP_ID}}",
-  "version": "1.0.3",
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.22",
+  "version": "1.0.0",
+  "id": "${{BOT_ID}}",
   "developer": {
     "name": "AI Tabletop Co",
     "websiteUrl": "https://github.com/scallighan/ai-tabletop-co",
     "privacyUrl": "https://github.com/scallighan/ai-tabletop-co",
     "termsOfUseUrl": "https://github.com/scallighan/ai-tabletop-co"
   },
+  "name": {
+    "short": "AI Tabletop Co Copilot",
+    "full": "AI Tabletop Co Copilot and Insights Agent"
+  },
+  "description": {
+    "short": "Custom copilot for AI Tabletop Co",
+    "full": "Custom copilot for AI Tabletop Co to understand business insights"
+  },
   "icons": {
     "color": "color.png",
     "outline": "outline.png"
   },
-  "name": {
-    "short": "AI Tabletop Co Insights Agent",
-    "full": "AI Tabletop Co Insights Agent Demo"
-  },
-  "description": {
-    "short": "Interact with a Foundry agent",
-    "full": "Interact with a Foundry agent full description"
-  },
-  "accentColor": "#FFFFFF",
-  "copilotAgents": { 
-    "customEngineAgents": [ 
-        { 
-            "id": "${{BOT_ID}}", 
-            "type": "bot" 
-        } 
-    ]
+  "accentColor": "#4464ee",
+  "validDomains": [],
+  "webApplicationInfo": {
+    "id": "${{BOT_ID}}",
+    "resource": "api://botid-${{BOT_ID}}"
   },
   "bots": [
     {
       "botId": "${{BOT_ID}}",
-      "scopes": ["personal"],
-      "isNotificationOnly": false,
-      "supportsCalling": false,
-      "supportsVideo": false,
-      "supportsFiles": false,
-      "commandLists":[
-        {
-            "scopes": [
-                "personal"
-            ],
-            "commands": [
-                {
-                    "title": "help",
-                    "description": "Show the help information"
-                }
-            ]
-        }
-      ]
+      "scopes": [
+        "personal",
+        "team",
+        "groupChat",
+        "copilot"
+      ],
+      "supportsFiles": true,
+      "isNotificationOnly": false
     }
   ],
-  "permissions": [
-    "identity",
-    "messageTeamMembers"
-  ],
-  "validDomains": [
-    "${{BOT_DOMAIN}}",
-    "*.botframework.com"
-  ],
-  "webApplicationInfo": {
-    "id": "${{BOT_ID}}",
-    "resource": "api://botid-${{BOT_ID}}"
+  "copilotAgents": {
+    "customEngineAgents": [
+      {
+        "id": "${{BOT_ID}}",
+        "type": "bot",
+        "disclaimer": {
+          "text": "This agent uses AI. Please verify important information."
+        }
+      }
+    ]
   }
 }

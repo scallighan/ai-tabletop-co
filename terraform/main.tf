@@ -485,6 +485,11 @@ resource "azurerm_container_app" "bot" {
         value = "gpt-5.4-mini"
       }
 
+      env{
+        name = "AGENT_NAME"
+        value = var.agent_name
+      }
+
     }
     http_scale_rule {
       name                = "http-1"
@@ -518,12 +523,12 @@ resource "azurerm_container_app" "bot" {
 
 resource "azurerm_user_assigned_identity" "bot" {
   location            = azurerm_resource_group.this.location
-  name                = "uai-bot-${local.func_name}"
+  name                = "uai-bot-${local.func_name}-v2"
   resource_group_name = azurerm_resource_group.this.name
 }
 
 resource "azurerm_bot_service_azure_bot" "teamsbot" {
-  name                = "bot-${local.func_name}"
+  name                = "bot-${local.func_name}-v2"
   resource_group_name = azurerm_resource_group.this.name
   location            = "global"
   microsoft_app_id    = azurerm_user_assigned_identity.bot.client_id
