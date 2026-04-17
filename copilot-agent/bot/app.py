@@ -88,13 +88,13 @@ async def on_message(context: TurnContext, _):
             if CONVERSATION_ID is None:
                 conversation = openai_client.conversations.create()
                 CONVERSATION_ID = conversation.id
-            
+            print(f"Using conversation ID: {CONVERSATION_ID}")
             response = openai_client.responses.create(
+                tool_choice="required",
                 conversation=CONVERSATION_ID,
                 input=text,
                 extra_body={"agent_reference": {"name": agent_name, "type": "agent_reference"}},
             )
-            
             output_text = await handle_responses(agent_name, openai_client, response)
             await context.send_activity(f"{output_text}")
     except Exception as e:

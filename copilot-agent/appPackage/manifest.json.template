@@ -14,8 +14,8 @@
     "outline": "outline.png"
   },
   "name": {
-    "short": "Analytics-Insights-Agent",
-    "full": "Analytics Insights Agent"
+    "short": "AI Tabletop Co Insights",
+    "full": "AI Tabletop Co Insights Agent"
   },
   "description": {
     "short": "Interact with a Foundry agent",
