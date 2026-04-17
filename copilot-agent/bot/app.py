@@ -90,7 +90,6 @@ async def on_message(context: TurnContext, _):
                 CONVERSATION_ID = conversation.id
             print(f"Using conversation ID: {CONVERSATION_ID}")
             response = openai_client.responses.create(
-                tool_choice="required",
                 conversation=CONVERSATION_ID,
                 input=text,
                 extra_body={"agent_reference": {"name": agent_name, "type": "agent_reference"}},
