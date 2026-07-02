@@ -284,7 +284,7 @@ resource azurerm_user_assigned_identity "agent" {
 # give the agent identity access to the AI Foundry project with Azure AI User role
 resource "azurerm_role_assignment" "agent_foundry_access" {
   scope                = azurerm_resource_group.this.id
-  role_definition_name = "Azure AI User"
+  role_definition_name = "Foundry User"
   principal_id         = azurerm_user_assigned_identity.agent.principal_id
 }
 
@@ -549,7 +549,7 @@ resource "azurerm_bot_channel_ms_teams" "teams" {
 # give the bot identity access to foundry with Azure AI User role
 resource "azurerm_role_assignment" "bot_foundry_access" {
   scope                = azurerm_resource_group.this.id
-  role_definition_name = "Azure AI User"
+  role_definition_name = "Foundry User"
   principal_id         = azurerm_user_assigned_identity.bot.principal_id
 }
 
@@ -631,7 +631,7 @@ resource "azurerm_role_assignment" "search_storage" {
 
 resource "azurerm_role_assignment" "azure_ai_user_ai_search" {
   scope                = azurerm_resource_group.this.id
-  role_definition_name = "Azure AI User"
+  role_definition_name = "Foundry User"
   principal_id         = azurerm_search_service.this.identity[0].principal_id
 }
 
